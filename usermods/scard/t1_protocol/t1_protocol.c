@@ -850,14 +850,22 @@ static bool handle_atr(t1_inst_t* inst, t1_atr_decoded_t* p_atr,
       inst->config[t1_cfg_use_crc] = p_atr->t1_bytes[t1_atr_tc1] & 1;
     }
 
-    // If card is in negotiable mode we need to start PPS exchange
+    // PPS exchange: only needed if card is in negotiable mode (TA2 absent)
+    // and card supports alternative parameters (TA1 present and not default).
+    // Per ISO 7816-3: PPS is OPTIONAL - if skipped, use default Fi=372/Di=1.
+    // Skip PPS if:
+    //   - TA2 present (specific mode, params fixed by card)
+    //   - TA1 absent (card didn't specify alternative params)
+    //   - TA1 = 0x11 (default Fi=372, Di=1 - no speed change needed)
     if(p_atr->t1_bytes[t1_atr_ta2] == -1 && p_needs_ppsx) {
-      *p_needs_ppsx = true;
+      // Card is in negotiable mode - check if PPS would change params
+      int ta1 = p_atr->t1_bytes[t1_atr_ta1];
+      if(ta1 != -1 && ta1 != 0x11) {
+        // TA1 present and not default - PPS exchange recommended
+        *p_needs_ppsx = true;
+      }
+      // else: no TA1 or TA1=0x11, stay at defaults, no PPS needed
     }
-    return true;
-  }
-  return false;
-}
 
 /**
  * Handles corrupted, incorrect or lost block
