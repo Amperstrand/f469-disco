@@ -129,15 +129,11 @@ void scard_interface_print(const mp_print_t *print, scard_handle_t handle) {
  * @return          clock frequency in Hz
  */
 static inline uint32_t get_usart_clock(uint8_t usart_id) {
-#if defined(STM32F4)
   if(usart_id == 1U || usart_id == 6U) { // USART1 & USART6 are connected APB2
     return HAL_RCC_GetPCLK2Freq();
   } else {                               // Other USARTs are connected APB1
     return HAL_RCC_GetPCLK1Freq();
   }
-#else // STM32F4
-  #error MCU series is not supported by smart card interface yet
-#endif // STM32F4
 }
 
 /**
@@ -150,7 +146,6 @@ static inline uint32_t get_usart_clock(uint8_t usart_id) {
  * @param dir     half-duplex direction (tx, rx, or none)
  */
 static void set_half_duplex(scard_handle_t handle, hd_dir_t dir) {
-#if defined(STM32F4)
   USART_TypeDef* usart = handle->sc_handle.Instance;
   uint32_t irq_state = disable_irq();
 
@@ -178,9 +173,6 @@ static void set_half_duplex(scard_handle_t handle, hd_dir_t dir) {
   }
 
   enable_irq(irq_state);
-#else // STM32F4
-  #error MCU series is not supported by smart card interface yet
-#endif // STM32F4
 }
 
 /**
@@ -191,7 +183,6 @@ static void set_half_duplex(scard_handle_t handle, hd_dir_t dir) {
  */
 static bool init_smartcard(SMARTCARD_HandleTypeDef* sc_handle,
                            USART_TypeDef* usart_handle, uint8_t usart_id) {
-#if defined(STM32F4)
   // Calculate clock prescaler, programmed into USART_GTPR.PSC
   uint32_t clk_in = get_usart_clock(usart_id);
   uint32_t prescaler = (clk_in + 2U * SCARD_MAX_CLK_FREQUENCY_HZ - 1U) /
@@ -231,9 +222,6 @@ static bool init_smartcard(SMARTCARD_HandleTypeDef* sc_handle,
     __HAL_SMARTCARD_ENABLE(sc_handle);
     return true;
   }
-#else // STM32F4
-  #error MCU series is not supported by smart card interface yet
-#endif // STM32F4
 
   return false;
 }
