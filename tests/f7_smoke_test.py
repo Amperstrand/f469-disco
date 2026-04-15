@@ -66,6 +66,9 @@ def make_colored_block(parent, x, y, w, h, color_hex, label_text=""):
 def run():
     display.init(False)
 
+    display.fill_test()
+    time.sleep_ms(3000)
+
     th = lv.theme_material_init(210, lv.font_roboto_16)
     lv.theme_set_current(th)
 

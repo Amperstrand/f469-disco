@@ -37,6 +37,7 @@
 #define FT5336_MAX_TOUCH        ((uint8_t)5)
 
 static LTDC_HandleTypeDef hltdc;
+static DMA2D_HandleTypeDef hdma2d;
 static lv_disp_drv_t disp_drv;
 static lv_disp_buf_t disp_buf;
 static lv_color_t *framebuffer;
@@ -44,6 +45,8 @@ static lv_color_t *draw_buf;
 static i2c_t *touch_i2c;
 static bool display_ready;
 static bool touch_ready;
+
+static bool dma2d_ready;
 
 void tft_on(void) {
     HAL_GPIO_WritePin(LCD_DISP_GPIO_PORT, LCD_DISP_PIN, GPIO_PIN_SET);
@@ -69,13 +72,34 @@ static void tft_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *col
     }
 
     uint32_t copy_width = (uint32_t)(x2 - x1 + 1);
-    for (int32_t y = y1; y <= y2; ++y) {
-        memcpy(framebuffer + y * LV_HOR_RES_MAX + x1, color_p, copy_width * sizeof(lv_color_t));
-        color_p += copy_width;
+    uint32_t copy_height = (uint32_t)(y2 - y1 + 1);
+
+    if (dma2d_ready) {
+        SCB_CleanDCache();
+        hdma2d.Init.Mode = DMA2D_M2M;
+        hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
+        hdma2d.Init.OutputOffset = (uint32_t)(LV_HOR_RES_MAX - copy_width);
+        HAL_DMA2D_Init(&hdma2d);
+        HAL_DMA2D_Start(&hdma2d,
+            (uint32_t)color_p,
+            (uint32_t)(framebuffer + y1 * LV_HOR_RES_MAX + x1),
+            copy_width,
+            copy_height);
+        HAL_DMA2D_PollForTransfer(&hdma2d, 100);
+    } else {
+        for (int32_t y = y1; y <= y2; ++y) {
+            memcpy(framebuffer + y * LV_HOR_RES_MAX + x1, color_p, copy_width * sizeof(lv_color_t));
+            color_p += copy_width;
+        }
     }
 
     SCB_CleanDCache();
     lv_disp_flush_ready(drv);
+}
+
+void HAL_DMA2D_MspInit(DMA2D_HandleTypeDef *instance) {
+    (void)instance;
+    __HAL_RCC_DMA2D_CLK_ENABLE();
 }
 
 void HAL_LTDC_MspInit(LTDC_HandleTypeDef *instance) {
@@ -188,6 +212,15 @@ void tft_init(void) {
     layer_cfg.ImageHeight = LV_VER_RES_MAX;
     HAL_LTDC_ConfigLayer(&hltdc, &layer_cfg, 1);
 
+    memset(&hdma2d, 0, sizeof(hdma2d));
+    hdma2d.Instance = DMA2D;
+    hdma2d.Init.Mode = DMA2D_M2M;
+    hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
+    hdma2d.Init.OutputOffset = 0;
+    if (HAL_DMA2D_Init(&hdma2d) == HAL_OK) {
+        dma2d_ready = true;
+    }
+
     tft_on();
     SCB_CleanDCache();
 
@@ -260,13 +293,28 @@ static bool touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     return false;
 }
 
-static void cpu_fill_rect(uint32_t color, int32_t x, int32_t y, int32_t w, int32_t h) {
-    uint32_t *fb = (uint32_t *)framebuffer;
-    for (int32_t row = y; row < y + h; row++) {
-        for (int32_t col = x; col < x + w; col++) {
-            fb[row * LV_HOR_RES_MAX + col] = color;
+static void dma2d_fill_rect(uint32_t color, int32_t x, int32_t y, int32_t w, int32_t h) {
+    if (!dma2d_ready) {
+        uint32_t *fb = (uint32_t *)framebuffer;
+        for (int32_t row = y; row < y + h; row++) {
+            for (int32_t col = x; col < x + w; col++) {
+                fb[row * LV_HOR_RES_MAX + col] = color;
+            }
         }
+        return;
     }
+
+    SCB_CleanDCache();
+    hdma2d.Init.Mode = DMA2D_R2M;
+    hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
+    hdma2d.Init.OutputOffset = (uint32_t)(LV_HOR_RES_MAX - w);
+    HAL_DMA2D_Init(&hdma2d);
+    HAL_DMA2D_Start(&hdma2d,
+        color,
+        (uint32_t)(framebuffer + y * LV_HOR_RES_MAX + x),
+        (uint32_t)w,
+        (uint32_t)h);
+    HAL_DMA2D_PollForTransfer(&hdma2d, 100);
 }
 
 void tft_fill_test(void) {
@@ -280,10 +328,10 @@ void tft_fill_test(void) {
     int32_t hw = LV_HOR_RES_MAX / 2;
     int32_t hh = LV_VER_RES_MAX / 2;
 
-    cpu_fill_rect(0xFFFF0000, 0, 0, hw, hh);
-    cpu_fill_rect(0xFF00FF00, hw, 0, hw, hh);
-    cpu_fill_rect(0xFF0000FF, 0, hh, hw, hh);
-    cpu_fill_rect(0xFFFFFF00, hw, hh, hw, hh);
+    dma2d_fill_rect(0xFFFF0000, 0, 0, hw, hh);
+    dma2d_fill_rect(0xFF00FF00, hw, 0, hw, hh);
+    dma2d_fill_rect(0xFF0000FF, 0, hh, hw, hh);
+    dma2d_fill_rect(0xFFFFFF00, hw, hh, hw, hh);
 
     SCB_CleanDCache();
 }

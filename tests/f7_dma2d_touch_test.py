@@ -1,4 +1,4 @@
-import udisplay
+import display
 import lvgl as lv
 import utime as time
 from machine import I2C
@@ -38,10 +38,29 @@ class TouchReader:
         return self.last_x, self.last_y, True
 
 
-def run():
-    udisplay.init()
+def make_colored_block(parent, x, y, w, h, color_hex, label_text=""):
+    cont = lv.cont(parent)
+    cont.set_size(w, h)
+    cont.set_pos(x, y)
+    cont.set_fit(lv.FIT.NONE)
+    style = lv.style_t()
+    lv.style_copy(style, lv.style_plain)
+    style.body.main_color = lv.color_hex(color_hex)
+    style.body.grad_color = lv.color_hex(color_hex)
+    style.body.border.width = 0
+    cont.set_style(0, style)
+    if label_text:
+        lbl = lv.label(cont)
+        lbl.set_text(label_text)
+        lbl.set_align(lv.label.ALIGN.CENTER)
+        lbl.align(cont, lv.ALIGN.CENTER, 0, 0)
+    return cont
 
-    udisplay.fill_test()
+
+def run():
+    display.init(False)
+
+    display.fill_test()
     time.sleep_ms(3000)
 
     th = lv.theme_material_init(210, lv.font_roboto_16)
@@ -50,8 +69,18 @@ def run():
     scr = lv.obj()
     lv.scr_load(scr)
 
+    row_h = VER // 2
+    col_w = HOR // 3
+
+    make_colored_block(scr, 0, 0, col_w, row_h, 0xFF0000, "RED")
+    make_colored_block(scr, col_w, 0, col_w, row_h, 0x00FF00, "GREEN")
+    make_colored_block(scr, 2 * col_w, 0, col_w, row_h, 0x0000FF, "BLUE")
+    make_colored_block(scr, 0, row_h, col_w, row_h, 0xFFFF00, "YELLOW")
+    make_colored_block(scr, col_w, row_h, col_w, row_h, 0xFF00FF, "MAGENTA")
+    make_colored_block(scr, 2 * col_w, row_h, col_w, row_h, 0x00FFFF, "CYAN")
+
     title = lv.label(scr)
-    title.set_text("F746G-DISCO DISPLAY+TOUCH TEST")
+    title.set_text("F746G-DISCO DMA2D+TOUCH TEST")
     title.align(scr, lv.ALIGN.IN_TOP_MID, 0, 5)
 
     coord = lv.label(scr)
@@ -63,7 +92,7 @@ def run():
     status.align(scr, lv.ALIGN.IN_BOTTOM_MID, 0, -5)
 
     for _ in range(20):
-        udisplay.update(30)
+        display.update(30)
 
     touch = TouchReader()
 
@@ -74,7 +103,7 @@ def run():
             count += 1
             coord.set_text("X:%d Y:%d" % (x, y))
             status.set_text("Touch #%d" % count)
-        udisplay.update(30)
+        display.update(30)
         time.sleep_ms(30)
 
 

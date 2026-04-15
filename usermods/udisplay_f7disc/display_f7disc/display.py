@@ -1,4 +1,4 @@
-from udisplay import update, on, off, set_rotation
+from udisplay import update, on, off, set_rotation, fill_test
 
 
 def init(autoupdate=True):
