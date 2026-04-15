@@ -9,6 +9,7 @@ void tft_init(void);
 void touchpad_init(void);
 void tft_on(void);
 void tft_off(void);
+void tft_fill_test(void);
 
 #ifdef __cplusplus
 }

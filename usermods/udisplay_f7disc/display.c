@@ -33,6 +33,12 @@ STATIC mp_obj_t display_off(void) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(display_off_obj, display_off);
 
+STATIC mp_obj_t display_fill_test(void) {
+    tft_fill_test();
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(display_fill_test_obj, display_fill_test);
+
 STATIC mp_obj_t display_set_rotation(mp_obj_t rot_obj) {
     int rot = mp_obj_get_int(rot_obj);
     if (rot < 0 || rot > 1) {
@@ -48,6 +54,7 @@ STATIC const mp_rom_map_elem_t display_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_update), MP_ROM_PTR(&display_update_obj) },
     { MP_ROM_QSTR(MP_QSTR_on), MP_ROM_PTR(&display_on_obj) },
     { MP_ROM_QSTR(MP_QSTR_off), MP_ROM_PTR(&display_off_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill_test), MP_ROM_PTR(&display_fill_test_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_rotation), MP_ROM_PTR(&display_set_rotation_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(display_module_globals, display_module_globals_table);

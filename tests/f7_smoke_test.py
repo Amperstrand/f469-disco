@@ -16,22 +16,28 @@ FT5336_GMODE = 0xA4
 class TouchReader:
     def __init__(self):
         self.i2c = I2C(3, freq=400000)
-        chip_id = self.i2c.readfrom_mem(FT5336_ADDR, FT5336_CHIP_ID, 1)[0]
-        if chip_id != 0x51:
-            raise OSError("FT5336 chip ID mismatch: 0x%02X" % chip_id)
+        self.chip_id = self.i2c.readfrom_mem(FT5336_ADDR, FT5336_CHIP_ID, 1)[0]
+        if self.chip_id != 0x51:
+            raise OSError("FT5336 chip ID mismatch: 0x%02X" % self.chip_id)
         self.i2c.writeto_mem(FT5336_ADDR, FT5336_GMODE, b'\x00')
         self.last_x = 0
         self.last_y = 0
+        self.last_td = 0
+        self.last_raw_x = 0
+        self.last_raw_y = 0
         self.touching = False
 
     def read(self):
         td = self.i2c.readfrom_mem(FT5336_ADDR, FT5336_TD_STAT, 1)[0] & 0x0F
+        self.last_td = td
         if td == 0 or td > 5:
             self.touching = False
             return self.last_x, self.last_y, False
         raw = self.i2c.readfrom_mem(FT5336_ADDR, FT5336_P1_XH, 4)
         raw_x = ((raw[0] & 0x0F) << 8) | raw[1]
         raw_y = ((raw[2] & 0x0F) << 8) | raw[3]
+        self.last_raw_x = raw_x
+        self.last_raw_y = raw_y
         self.last_x = raw_y
         self.last_y = raw_x
         self.touching = True
@@ -80,9 +86,17 @@ def run():
     title_lbl.set_text("F746G-DISCO SMOKE TEST")
     title_lbl.align(scr, lv.ALIGN.IN_TOP_MID, 0, 5)
 
+    chip_lbl = lv.label(scr)
+    chip_lbl.set_text("FT5336: probing...")
+    chip_lbl.align(scr, lv.ALIGN.IN_TOP_LEFT, 8, 8)
+
     coord_lbl = lv.label(scr)
     coord_lbl.set_text("Touch the screen...")
     coord_lbl.align(scr, lv.ALIGN.CENTER, 0, 0)
+
+    raw_lbl = lv.label(scr)
+    raw_lbl.set_text("RAW: --")
+    raw_lbl.align(scr, lv.ALIGN.IN_TOP_LEFT, 8, 28)
 
     status_lbl = lv.label(scr)
     status_lbl.set_text("Waiting for touch...")
@@ -91,15 +105,26 @@ def run():
     for _ in range(20):
         display.update(30)
 
-    touch = TouchReader()
+    try:
+        touch = TouchReader()
+        chip_lbl.set_text("FT5336 ID: 0x%02X" % touch.chip_id)
+    except Exception as exc:
+        chip_lbl.set_text("FT5336 init failed")
+        raw_lbl.set_text(str(exc))
+        while True:
+            display.update(30)
+            time.sleep_ms(30)
 
     touch_count = 0
     while True:
         x, y, touching = touch.read()
+        raw_lbl.set_text("TD:%d RX:%d RY:%d" % (touch.last_td, touch.last_raw_x, touch.last_raw_y))
         if touching:
             touch_count += 1
             coord_lbl.set_text("X:%d Y:%d" % (x, y))
             status_lbl.set_text("Touch #%d" % touch_count)
+        else:
+            status_lbl.set_text("Waiting for touch...")
         display.update(30)
         time.sleep_ms(30)
 

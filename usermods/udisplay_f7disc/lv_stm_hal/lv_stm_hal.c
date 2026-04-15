@@ -12,29 +12,29 @@
 #include "lvgl.h"
 #include "lv_stm_hal.h"
 
-#define RK043FN48H_WIDTH ((uint16_t)480)
-#define RK043FN48H_HEIGHT ((uint16_t)272)
-#define RK043FN48H_HSYNC ((uint16_t)41)
-#define RK043FN48H_HBP ((uint16_t)13)
-#define RK043FN48H_HFP ((uint16_t)32)
-#define RK043FN48H_VSYNC ((uint16_t)10)
-#define RK043FN48H_VBP ((uint16_t)2)
-#define RK043FN48H_VFP ((uint16_t)2)
+#define RK043FN48H_WIDTH        ((uint16_t)480)
+#define RK043FN48H_HEIGHT       ((uint16_t)272)
+#define RK043FN48H_HSYNC        ((uint16_t)41)
+#define RK043FN48H_HBP          ((uint16_t)13)
+#define RK043FN48H_HFP          ((uint16_t)32)
+#define RK043FN48H_VSYNC        ((uint16_t)10)
+#define RK043FN48H_VBP          ((uint16_t)2)
+#define RK043FN48H_VFP          ((uint16_t)2)
 #define RK043FN48H_FREQUENCY_DIVIDER 5
 
-#define LCD_DISP_PIN GPIO_PIN_12
-#define LCD_DISP_GPIO_PORT GPIOI
-#define LCD_BL_CTRL_PIN GPIO_PIN_3
-#define LCD_BL_CTRL_GPIO_PORT GPIOK
+#define LCD_DISP_PIN            GPIO_PIN_12
+#define LCD_DISP_GPIO_PORT      GPIOI
+#define LCD_BL_CTRL_PIN         GPIO_PIN_3
+#define LCD_BL_CTRL_GPIO_PORT   GPIOK
 
-#define FT5336_ADDR ((uint16_t)0x38)
-#define FT5336_TD_STAT_REG ((uint8_t)0x02)
-#define FT5336_P1_XH_REG ((uint8_t)0x03)
-#define FT5336_GMODE_REG ((uint8_t)0xA4)
-#define FT5336_GMODE_POLLING ((uint8_t)0x00)
-#define FT5336_CHIP_ID_REG ((uint8_t)0xA8)
-#define FT5336_CHIP_ID_VAL ((uint8_t)0x51)
-#define FT5336_MAX_TOUCH ((uint8_t)5)
+#define FT5336_ADDR             ((uint16_t)0x38)
+#define FT5336_TD_STAT_REG      ((uint8_t)0x02)
+#define FT5336_P1_XH_REG        ((uint8_t)0x03)
+#define FT5336_GMODE_REG        ((uint8_t)0xA4)
+#define FT5336_GMODE_POLLING    ((uint8_t)0x00)
+#define FT5336_CHIP_ID_REG      ((uint8_t)0xA8)
+#define FT5336_CHIP_ID_VAL      ((uint8_t)0x51)
+#define FT5336_MAX_TOUCH        ((uint8_t)5)
 
 static LTDC_HandleTypeDef hltdc;
 static lv_disp_drv_t disp_drv;
@@ -258,6 +258,34 @@ static bool touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     data->point.y = y;
     data->state = LV_INDEV_STATE_PR;
     return false;
+}
+
+static void cpu_fill_rect(uint32_t color, int32_t x, int32_t y, int32_t w, int32_t h) {
+    uint32_t *fb = (uint32_t *)framebuffer;
+    for (int32_t row = y; row < y + h; row++) {
+        for (int32_t col = x; col < x + w; col++) {
+            fb[row * LV_HOR_RES_MAX + col] = color;
+        }
+    }
+}
+
+void tft_fill_test(void) {
+    if (!framebuffer) {
+        return;
+    }
+
+    SCB_CleanInvalidateDCache();
+    memset(framebuffer, 0x00, sizeof(lv_color_t) * LV_HOR_RES_MAX * LV_VER_RES_MAX);
+
+    int32_t hw = LV_HOR_RES_MAX / 2;
+    int32_t hh = LV_VER_RES_MAX / 2;
+
+    cpu_fill_rect(0xFFFF0000, 0, 0, hw, hh);
+    cpu_fill_rect(0xFF00FF00, hw, 0, hw, hh);
+    cpu_fill_rect(0xFF0000FF, 0, hh, hw, hh);
+    cpu_fill_rect(0xFFFFFF00, hw, hh, hw, hh);
+
+    SCB_CleanDCache();
 }
 
 void touchpad_init(void) {
