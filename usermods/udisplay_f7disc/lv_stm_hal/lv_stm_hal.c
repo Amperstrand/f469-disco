@@ -42,7 +42,7 @@ static lv_disp_drv_t disp_drv;
 static lv_disp_buf_t disp_buf;
 static lv_color_t *framebuffer;
 static lv_color_t *draw_buf;
-static i2c_t *touch_i2c;
+static I2C_HandleTypeDef *touch_hi2c;
 static bool display_ready;
 static bool touch_ready;
 
@@ -234,15 +234,17 @@ void tft_init(void) {
 }
 
 static int ft5336_read(uint8_t reg, uint8_t *dest, size_t len) {
-    if (i2c_writeto(touch_i2c, FT5336_ADDR, &reg, 1, true) != 0) {
-        return -1;
-    }
-    return i2c_readfrom(touch_i2c, FT5336_ADDR, dest, len, true);
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(touch_hi2c,
+        FT5336_ADDR << 1, reg, I2C_MEMADD_SIZE_8BIT,
+        dest, len, 100);
+    return (status == HAL_OK) ? 0 : -1;
 }
 
 static int ft5336_write(uint8_t reg, uint8_t val) {
-    uint8_t buf[2] = {reg, val};
-    return i2c_writeto(touch_i2c, FT5336_ADDR, buf, 2, true);
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Write(touch_hi2c,
+        FT5336_ADDR << 1, reg, I2C_MEMADD_SIZE_8BIT,
+        &val, 1, 100);
+    return (status == HAL_OK) ? 0 : -1;
 }
 
 static bool touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
@@ -341,10 +343,8 @@ void touchpad_init(void) {
         return;
     }
 
-    touch_i2c = I2C3;
-    if (i2c_init(touch_i2c, MICROPY_HW_I2C3_SCL, MICROPY_HW_I2C3_SDA, 400000, 100) != 0) {
-        return;
-    }
+    touch_hi2c = &I2CHandle3;
+    pyb_i2c_init_freq(&pyb_i2c_obj[2], 400000);
 
     uint8_t chip_id = 0;
     ft5336_read(FT5336_CHIP_ID_REG, &chip_id, 1);
@@ -358,4 +358,8 @@ void touchpad_init(void) {
     indev_drv.type = LV_INDEV_TYPE_POINTER;
     indev_drv.read_cb = touchpad_read;
     lv_indev_drv_register(&indev_drv);
+}
+
+bool touchpad_ready(void) {
+    return touch_ready;
 }
