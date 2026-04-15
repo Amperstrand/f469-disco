@@ -141,7 +141,7 @@ void tft_init(void) {
     framebuffer = alloc_aligned_rooted(sizeof(lv_color_t) * LV_HOR_RES_MAX * LV_VER_RES_MAX, &MP_STATE_PORT(display_fb_raw));
     draw_buf = alloc_aligned_rooted(sizeof(lv_color_t) * LV_HOR_RES_MAX * 20, &MP_STATE_PORT(display_drawbuf_raw));
 
-    memset(framebuffer, 0xFF, sizeof(lv_color_t) * LV_HOR_RES_MAX * LV_VER_RES_MAX);
+    memset(framebuffer, 0x00, sizeof(lv_color_t) * LV_HOR_RES_MAX * LV_VER_RES_MAX);
 
     RCC_PeriphCLKInitTypeDef periph_clk = {0};
     periph_clk.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
@@ -188,13 +188,8 @@ void tft_init(void) {
     layer_cfg.ImageHeight = LV_VER_RES_MAX;
     HAL_LTDC_ConfigLayer(&hltdc, &layer_cfg, 1);
 
-    uint32_t *fb32 = (uint32_t *)framebuffer;
-    for (int i = 0; i < LV_HOR_RES_MAX * LV_VER_RES_MAX; i++) {
-        fb32[i] = 0xFFFF0000;
-    }
-    SCB_CleanDCache();
-
     tft_on();
+    SCB_CleanDCache();
 
     lv_disp_buf_init(&disp_buf, draw_buf, NULL, LV_HOR_RES_MAX * 20);
     lv_disp_drv_init(&disp_drv);
