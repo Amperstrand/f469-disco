@@ -8,6 +8,7 @@ FROZEN_MANIFEST_F7_EMPTY ?= ../../../manifests/f7_empty.py
 FROZEN_MANIFEST_F7 ?= ../../../manifests/f7.py
 FROZEN_MANIFEST_F7_DISPLAY ?= ../../../manifests/f7_display.py
 FROZEN_MANIFEST_F7_TEST ?= ../../../manifests/f7_display_test.py
+FROZEN_MANIFEST_F7_SPECTER ?= ../../../manifests/f7_specter_demo.py
 FROZEN_MANIFEST_UNIX ?= ../../../manifests/unix.py
 DEBUG ?= 0
 
@@ -104,6 +105,18 @@ f7-test: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
 		$(TARGET_DIR)/upy-f7disc-test.bin
 
+f7-specter-demo: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
+	@echo Building F746G-DISCO Specter demo firmware
+	make -C $(MPY_DIR)/ports/stm32 \
+		BOARD=STM32F7DISC \
+		USER_C_MODULES=../../../usermods_f7_display \
+		FROZEN_MANIFEST=$(FROZEN_MANIFEST_F7_SPECTER) \
+		CFLAGS_EXTRA="-DMODULE_DISPLAY_ENABLED=1" \
+		DEBUG=$(DEBUG) && \
+	arm-none-eabi-objcopy -O binary \
+		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
+		$(TARGET_DIR)/upy-f7disc-specter-demo.bin
+
 # Legacy F469 targets (still work with explicit BOARD=STM32F469DISC)
 empty: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 	@echo Building binary without frozen files
@@ -163,6 +176,9 @@ flash-f7-display:
 
 flash-f7-test:
 	st-flash --connect-under-reset --reset write $(TARGET_DIR)/upy-f7disc-test.bin 0x08000000
+
+flash-f7-specter-demo:
+	st-flash --connect-under-reset --reset write $(TARGET_DIR)/upy-f7disc-specter-demo.bin 0x08000000
 
 all: mpy-cross f7-minimal f7-empty f7 unix
 
