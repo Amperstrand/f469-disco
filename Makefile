@@ -6,10 +6,11 @@ FROZEN_MANIFEST_EMPTY ?= ../../../manifests/empty.py
 FROZEN_MANIFEST_FULL ?= ../../../manifests/disco.py
 FROZEN_MANIFEST_F7_EMPTY ?= ../../../manifests/f7_empty.py
 FROZEN_MANIFEST_F7 ?= ../../../manifests/f7.py
+FROZEN_MANIFEST_F7_DISPLAY ?= ../../../manifests/f7_display.py
 FROZEN_MANIFEST_UNIX ?= ../../../manifests/unix.py
 DEBUG ?= 0
 
-F7_CFLAGS_EXTRA = -DMODULE_SECP256K1_ENABLED=1 -DMODULE_HASHLIB_ENABLED=1 -DMODULE_QRCODE_ENABLED=1
+F7_CFLAGS_EXTRA = -DMODULE_DISPLAY_ENABLED=1 -DMODULE_SECP256K1_ENABLED=1 -DMODULE_HASHLIB_ENABLED=1 -DMODULE_QRCODE_ENABLED=1
 
 # Derive output artifact name from BOARD
 BOARD_LC := $(shell echo $(BOARD) | tr '[:upper:]' '[:lower:]')
@@ -76,6 +77,19 @@ f7: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
 		$(TARGET_DIR)/upy-f7disc.bin
 
+# F746G-DISCO display-only bring-up firmware
+f7-display: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
+	@echo Building F746G-DISCO display bring-up firmware
+	make -C $(MPY_DIR)/ports/stm32 \
+		BOARD=STM32F7DISC \
+		USER_C_MODULES=../../../usermods_f7_display \
+		FROZEN_MANIFEST=$(FROZEN_MANIFEST_F7_DISPLAY) \
+		CFLAGS_EXTRA="-DMODULE_DISPLAY_ENABLED=1" \
+		DEBUG=$(DEBUG) && \
+	arm-none-eabi-objcopy -O binary \
+		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
+		$(TARGET_DIR)/upy-f7disc-display.bin
+
 # Legacy F469 targets (still work with explicit BOARD=STM32F469DISC)
 empty: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 	@echo Building binary without frozen files
@@ -129,6 +143,9 @@ flash-f7-empty:
 
 flash-f7:
 	st-flash --connect-under-reset --reset write $(TARGET_DIR)/upy-f7disc.bin 0x08000000
+
+flash-f7-display:
+	st-flash --connect-under-reset --reset write $(TARGET_DIR)/upy-f7disc-display.bin 0x08000000
 
 all: mpy-cross f7-minimal f7-empty f7 unix
 
