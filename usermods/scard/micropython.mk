@@ -7,7 +7,7 @@ ifeq ($(UNAME_S),)
 CFLAGS_USERMOD += -DT1_TX_FIFO_SIZE=600
 
 # Only STM32 series is currently supported
-ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),f0 f4 f7 l0 l4 wb))
+ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),f0 f4 l0 l4 wb))
 
 # Reproduce environment variables from main makefile (not defined at the moment)
 SCARD_MPY_DIR = $(USERMOD_DIR)/../../micropython
@@ -27,10 +27,10 @@ CFLAGS_USERMOD += -I$(SCARD_IO_MOD_DIR)
 CFLAGS_USERMOD += -I$(SCARD_IO_MOD_DIR)/t1_protocol
 CFLAGS_USERMOD += -I$(SCARD_IO_MOD_DIR)/ports/stm32
 
-else # MCU_SERIES == [f0, f4, f7, l0, l4, wb]
+else # MCU_SERIES == [f0, f4, l0, l4, wb]
 
-$(error Unsupported platform)
+# scard not supported on this MCU series - skipping
 
-endif # MCU_SERIES == [f0, f4, f7, l0, l4, wb]
+endif # MCU_SERIES == [f0, f4, l0, l4, wb]
 
 endif
