@@ -53,6 +53,22 @@ STATIC mp_obj_t display_touch_ready(void) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(display_touch_ready_obj, display_touch_ready);
 
+STATIC mp_obj_t display_touch_point(void) {
+    uint16_t x = 0;
+    uint16_t y = 0;
+    bool pressed = false;
+    bool ok = touchpad_get_point(&x, &y, &pressed);
+    if (!ok) {
+        return mp_const_none;
+    }
+    mp_obj_t tuple[3];
+    tuple[0] = mp_obj_new_bool(pressed);
+    tuple[1] = mp_obj_new_int(x);
+    tuple[2] = mp_obj_new_int(y);
+    return mp_obj_new_tuple(3, tuple);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(display_touch_point_obj, display_touch_point);
+
 STATIC const mp_rom_map_elem_t display_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_display) },
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&display_init_obj) },
@@ -61,6 +77,7 @@ STATIC const mp_rom_map_elem_t display_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_off), MP_ROM_PTR(&display_off_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_test), MP_ROM_PTR(&display_fill_test_obj) },
     { MP_ROM_QSTR(MP_QSTR_touch_ready), MP_ROM_PTR(&display_touch_ready_obj) },
+    { MP_ROM_QSTR(MP_QSTR_touch_point), MP_ROM_PTR(&display_touch_point_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_rotation), MP_ROM_PTR(&display_set_rotation_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(display_module_globals, display_module_globals_table);

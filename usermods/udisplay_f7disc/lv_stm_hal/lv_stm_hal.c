@@ -349,7 +349,6 @@ void touchpad_init(void) {
     uint8_t chip_id = 0;
     ft5336_read(FT5336_CHIP_ID_REG, &chip_id, 1);
     if (chip_id == FT5336_CHIP_ID_VAL) {
-        ft5336_write(FT5336_GMODE_REG, FT5336_GMODE_POLLING);
         touch_ready = true;
     }
 
@@ -362,4 +361,30 @@ void touchpad_init(void) {
 
 bool touchpad_ready(void) {
     return touch_ready;
+}
+
+bool touchpad_get_point(uint16_t *x, uint16_t *y, bool *pressed) {
+    if (!touch_ready) {
+        *x = 0;
+        *y = 0;
+        *pressed = false;
+        return false;
+    }
+
+    uint8_t touches = 0;
+    if (ft5336_read(FT5336_TD_STAT_REG, &touches, 1) != 0 || touches == 0 || touches > FT5336_MAX_TOUCH) {
+        *pressed = false;
+        return true;
+    }
+
+    uint8_t raw[4];
+    if (ft5336_read(FT5336_P1_XH_REG, raw, sizeof(raw)) != 0) {
+        *pressed = false;
+        return false;
+    }
+
+    *x = (uint16_t)(((raw[0] & 0x0F) << 8) | raw[1]);
+    *y = (uint16_t)(((raw[2] & 0x0F) << 8) | raw[3]);
+    *pressed = true;
+    return true;
 }
