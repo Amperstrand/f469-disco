@@ -1,6 +1,7 @@
-import display
+import udisplay as display
 import lvgl as lv
 import utime as time
+from lvqr import QRCode
 
 from embit import bip32, script, networks, hashes
 from binascii import hexlify
@@ -25,6 +26,7 @@ def p2wpkh_address(pubkey):
 class PopupScreen(lv.obj):
     def __init__(self, app, title="Title"):
         super().__init__()
+        self.set_size(HOR_RES, VER_RES)
         self.app = app
         self.old_screen = lv.scr_act()
         self.title = lv.label(self)
@@ -61,6 +63,23 @@ class MessageScreen(PopupScreen):
         self.lbl.align(self.title, lv.ALIGN.OUT_BOTTOM_MID, 0, 28)
 
 
+class QRScreen(PopupScreen):
+    def __init__(self, app, title="Title", message="Text", qrmessage="Text"):
+        super().__init__(app, title)
+
+        self.qr = QRCode(self)
+        self.qr.set_text(qrmessage)
+        self.qr.set_size(HOR_RES - 56)
+        self.qr.align(self.title, lv.ALIGN.OUT_BOTTOM_MID, 0, 18)
+
+        self.lbl = lv.label(self)
+        self.lbl.set_long_mode(lv.label.LONG.BREAK)
+        self.lbl.set_width(HOR_RES - 2 * PADDING)
+        self.lbl.set_align(lv.label.ALIGN.CENTER)
+        self.lbl.set_text(message)
+        self.lbl.align(self.qr, lv.ALIGN.OUT_BOTTOM_MID, 0, 16)
+
+
 class AddressScreen(PopupScreen):
     def __init__(self, app):
         super().__init__(app, "Receive (testnet)")
@@ -69,23 +88,30 @@ class AddressScreen(PopupScreen):
         self.index_lbl = lv.label(self)
         self.index_lbl.align(self.title, lv.ALIGN.OUT_BOTTOM_MID, 0, 18)
 
+        self.qr = QRCode(self)
+        self.qr.set_size(HOR_RES - 56)
+        self.qr.align(self.index_lbl, lv.ALIGN.OUT_BOTTOM_MID, 0, 16)
+
         self.addr_lbl = lv.label(self)
         self.addr_lbl.set_long_mode(lv.label.LONG.BREAK)
         self.addr_lbl.set_width(HOR_RES - 2 * PADDING)
         self.addr_lbl.set_align(lv.label.ALIGN.CENTER)
-        self.addr_lbl.align(self.index_lbl, lv.ALIGN.OUT_BOTTOM_MID, 0, 18)
+        self.addr_lbl.align(self.qr, lv.ALIGN.OUT_BOTTOM_MID, 0, 14)
 
         self.path_lbl = lv.label(self)
-        self.path_lbl.align(self, lv.ALIGN.IN_BOTTOM_MID, 0, -82)
+        self.path_lbl.set_long_mode(lv.label.LONG.BREAK)
+        self.path_lbl.set_width(HOR_RES - 2 * PADDING)
+        self.path_lbl.set_align(lv.label.ALIGN.CENTER)
+        self.path_lbl.align(self.addr_lbl, lv.ALIGN.OUT_BOTTOM_MID, 0, 12)
 
         self.prev_btn = lv.btn(self)
-        self.prev_btn.set_size(56, 44)
+        self.prev_btn.set_size(72, 44)
         self.prev_btn.align(self, lv.ALIGN.IN_BOTTOM_LEFT, PADDING, -18)
         self.prev_btn.set_event_cb(self.prev_address)
         lv.label(self.prev_btn).set_text(lv.SYMBOL.LEFT)
 
         self.next_btn = lv.btn(self)
-        self.next_btn.set_size(56, 44)
+        self.next_btn.set_size(72, 44)
         self.next_btn.align(self, lv.ALIGN.IN_BOTTOM_RIGHT, -PADDING, -18)
         self.next_btn.set_event_cb(self.next_address)
         lv.label(self.next_btn).set_text(lv.SYMBOL.RIGHT)
@@ -103,6 +129,7 @@ class AddressScreen(PopupScreen):
     def refresh(self):
         addr = self.app.get_address(self.index)
         self.index_lbl.set_text("Address #%d" % (self.index + 1))
+        self.qr.set_text("bitcoin:" + addr)
         self.addr_lbl.set_text(addr)
         self.path_lbl.set_text("Path: %s/0/%d" % (DERIVATION, self.index))
         self.prev_btn.set_state(lv.btn.STATE.INA if self.index == 0 else lv.btn.STATE.REL)
@@ -165,6 +192,7 @@ class SpecterMenuApp:
             return
 
         scr = lv.obj()
+        scr.set_size(HOR_RES, VER_RES)
         self.active_screen = scr
 
         title = lv.label(scr)
@@ -200,6 +228,7 @@ class SpecterMenuApp:
         if event is not None and event != lv.EVENT.RELEASED:
             return
         scr = lv.obj()
+        scr.set_size(HOR_RES, VER_RES)
         self.active_screen = scr
 
         title = lv.label(scr)
@@ -236,10 +265,11 @@ class SpecterMenuApp:
         if event is not None and event != lv.EVENT.RELEASED:
             return
         xpub = self.xpub
-        if len(xpub) > 50:
-            mid = len(xpub) // 2
-            xpub = xpub[:mid] + "\n" + xpub[mid:]
-        MessageScreen(self, "Master XPUB", xpub + "\n\nReal account xpub derived on-device.")
+        display_text = xpub
+        if len(display_text) > 48:
+            mid = len(display_text) // 2
+            display_text = display_text[:mid] + "\n" + display_text[mid:]
+        QRScreen(self, "Master XPUB", display_text, xpub)
 
     def show_sign_test(self, obj=None, event=None):
         if event is not None and event != lv.EVENT.RELEASED:
@@ -263,7 +293,7 @@ class SpecterMenuApp:
 
 
 def run():
-    display.init(False)
+    display.init()
     th = lv.theme_material_init(210, lv.font_roboto_16)
     lv.theme_set_current(th)
 

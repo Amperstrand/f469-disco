@@ -101,8 +101,15 @@ static void tft_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *col
         }
     }
 
-    uint32_t fb_size = sizeof(lv_color_t) * PHYS_HOR_RES * PHYS_VER_RES;
-    SCB_CleanDCache_by_Addr((uint32_t *)((uintptr_t)framebuffer & ~(uintptr_t)31), (fb_size + 31) & ~(uint32_t)31);
+    int32_t clean_px_min = y1;
+    int32_t clean_px_max = y2;
+    int32_t clean_py_min = (int32_t)PHYS_VER_RES - 1 - x2;
+    int32_t clean_py_max = (int32_t)PHYS_VER_RES - 1 - x1;
+
+    uint32_t clean_start = (uint32_t)(clean_py_min * PHYS_HOR_RES + clean_px_min);
+    uint32_t clean_end = (uint32_t)(clean_py_max * PHYS_HOR_RES + clean_px_max);
+    size_t clean_bytes = (size_t)(clean_end - clean_start + 1) * sizeof(lv_color_t);
+    SCB_CleanDCache_by_Addr((uint32_t *)((uintptr_t)(framebuffer + clean_start) & ~(uintptr_t)31), (clean_bytes + 31) & ~(uint32_t)31);
     lv_disp_flush_ready(drv);
 }
 
@@ -235,6 +242,8 @@ void tft_init(void) {
 
     lv_disp_buf_init(&disp_buf, draw_buf, NULL, LV_HOR_RES_MAX * 20);
     lv_disp_drv_init(&disp_drv);
+    disp_drv.hor_res = LV_HOR_RES_MAX;
+    disp_drv.ver_res = LV_VER_RES_MAX;
     disp_drv.buffer = &disp_buf;
     disp_drv.flush_cb = tft_flush;
     lv_disp_drv_register(&disp_drv);
