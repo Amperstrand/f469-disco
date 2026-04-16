@@ -22,13 +22,6 @@ def p2wpkh_address(pubkey):
     return s.address(NET)
 
 
-def on_release(callback):
-    def cb(obj, event):
-        if event == lv.EVENT.RELEASED:
-            callback()
-    return cb
-
-
 class SpecterCrypto:
     def __init__(self):
         self.root = bip32.HDKey.from_seed(SEED, version=NET["xprv"])
@@ -37,6 +30,7 @@ class SpecterCrypto:
         self.address_index = 0
         self.cached_addresses = {}
         self.sig_hex = None
+        self.active_screen = None
 
     def get_address(self, index):
         if index not in self.cached_addresses:
@@ -54,7 +48,7 @@ class SpecterCrypto:
         btn = lv.btn(screen)
         btn.set_pos(x, y)
         btn.set_size(w, h)
-        btn.set_event_cb(on_release(callback))
+        btn.set_event_cb(callback)
         label = lv.label(btn)
         label.set_text(text)
         label.set_align(lv.label.ALIGN.CENTER)
@@ -78,6 +72,7 @@ class SpecterCrypto:
 
     def message_screen(self, title_text, message, extra_btns=None):
         screen = lv.obj()
+        self.active_screen = screen
         self.title(screen, title_text)
         self.body(screen, message, 48)
         self.button(screen, lv.SYMBOL.LEFT + " Home", 20, 220, 120, 40, self.show_home)
@@ -86,8 +81,11 @@ class SpecterCrypto:
                 self.button(screen, text, x, 220, 120, 40, cb)
         lv.scr_load(screen)
 
-    def show_home(self):
+    def show_home(self, obj=None, event=None):
+        if event is not None and event != lv.EVENT.RELEASED:
+            return
         screen = lv.obj()
+        self.active_screen = screen
         self.title(screen, "Specter DIY F746")
 
         loaded = "secp256k1 + embit: OK"
@@ -107,8 +105,11 @@ class SpecterCrypto:
 
         lv.scr_load(screen)
 
-    def show_receive(self):
+    def show_receive(self, obj=None, event=None):
+        if event is not None and event != lv.EVENT.RELEASED:
+            return
         screen = lv.obj()
+        self.active_screen = screen
         self.title(screen, "Receive (testnet)")
 
         addr = self.get_address(self.address_index)
@@ -134,16 +135,22 @@ class SpecterCrypto:
 
         lv.scr_load(screen)
 
-    def prev_address(self):
+    def prev_address(self, obj=None, event=None):
+        if event is not None and event != lv.EVENT.RELEASED:
+            return
         if self.address_index > 0:
             self.address_index -= 1
         self.show_receive()
 
-    def next_address(self):
+    def next_address(self, obj=None, event=None):
+        if event is not None and event != lv.EVENT.RELEASED:
+            return
         self.address_index += 1
         self.show_receive()
 
-    def show_xpub(self):
+    def show_xpub(self, obj=None, event=None):
+        if event is not None and event != lv.EVENT.RELEASED:
+            return
         if len(self.xpub) > 50:
             mid = len(self.xpub) // 2
             display_text = self.xpub[:mid] + "\n" + self.xpub[mid:]
@@ -154,7 +161,9 @@ class SpecterCrypto:
             display_text + "\n\nReal account xpub derived on-device.",
         )
 
-    def show_sign_test(self):
+    def show_sign_test(self, obj=None, event=None):
+        if event is not None and event != lv.EVENT.RELEASED:
+            return
         if self.sig_hex is None:
             self.do_sign_test()
 
