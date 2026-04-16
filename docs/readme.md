@@ -5,6 +5,7 @@ Check out our step-by-step [tutorial](./tutorial) that will guide you through th
 ## Getting Started
 
 - [Build Guide](./build.md) - development environment setup and build commands
+- [STM32F746G-DISCO port checkpoint](./f746-port.md) - hardware-tested status and current known-good F746 build
 - [Release Process](./release.md) - how to create releases
 
 ## Simulator

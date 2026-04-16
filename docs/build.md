@@ -47,6 +47,8 @@ git submodule update --init --recursive
 make mpy-cross   # build cross-compiler (required first)
 make disco       # firmware with frozen bitcoin lib → bin/upy-f469disco.bin
 make empty       # minimal firmware → bin/upy-f469disco-empty.bin
+make f7-specter-demo    # F746 display + touch demo → bin/upy-f7disc-specter-demo.bin
+make f7-specter-crypto  # F746 crypto checkpoint → bin/upy-f7disc-specter-crypto.bin
 make unix        # simulator → bin/micropython_unix
 make test        # run tests
 make simulate    # run simulator
@@ -59,4 +61,6 @@ make all         # build everything
 All binaries output to `bin/`:
 - `upy-f469disco.bin` - full firmware
 - `upy-f469disco-empty.bin` - minimal firmware
+- `upy-f7disc-specter-demo.bin` - STM32F746G-DISCO display/touch demo firmware
+- `upy-f7disc-specter-crypto.bin` - STM32F746G-DISCO hardware-tested crypto checkpoint
 - `micropython_unix` - simulator binary
