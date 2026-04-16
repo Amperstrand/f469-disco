@@ -13,6 +13,7 @@ SRC_USERMOD += $(SHARED_DISPLAY_DIR)/fonts/font_roboto_mono_16.c
 SRC_USERMOD += $(SHARED_DISPLAY_DIR)/fonts/font_roboto_mono_12.c
 SRC_USERMOD += $(SHARED_DISPLAY_DIR)/pixelart/px_img.c
 SRC_USERMOD += $(F7_MPY_DIR)/lib/stm32lib/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_ltdc.c
+SRC_USERMOD += $(F7_MPY_DIR)/lib/stm32lib/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma2d.c
 
 LVGL_DIR := $(SHARED_DISPLAY_DIR)
 include $(LVGL_DIR)/lvgl/lvgl.mk
