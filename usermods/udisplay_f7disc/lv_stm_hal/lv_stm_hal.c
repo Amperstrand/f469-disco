@@ -36,6 +36,9 @@
 #define FT5336_CHIP_ID_VAL      ((uint8_t)0x51)
 #define FT5336_MAX_TOUCH        ((uint8_t)5)
 
+#define PHYS_HOR_RES            RK043FN48H_WIDTH
+#define PHYS_VER_RES            RK043FN48H_HEIGHT
+
 static LTDC_HandleTypeDef hltdc;
 static DMA2D_HandleTypeDef hdma2d;
 static lv_disp_drv_t disp_drv;
@@ -47,6 +50,12 @@ static bool display_ready;
 static bool touch_ready;
 
 static bool dma2d_ready;
+
+static inline uint32_t phys_index_from_logical(int32_t lx, int32_t ly) {
+    int32_t px = (int32_t)PHYS_HOR_RES - 1 - ly;
+    int32_t py = lx;
+    return (uint32_t)(py * PHYS_HOR_RES + px);
+}
 
 void tft_on(void) {
     HAL_GPIO_WritePin(LCD_DISP_GPIO_PORT, LCD_DISP_PIN, GPIO_PIN_SET);
@@ -61,39 +70,39 @@ void tft_off(void) {
 }
 
 static void tft_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
-    int32_t x1 = area->x1 < 0 ? 0 : area->x1;
-    int32_t y1 = area->y1 < 0 ? 0 : area->y1;
-    int32_t x2 = area->x2 >= LV_HOR_RES_MAX ? LV_HOR_RES_MAX - 1 : area->x2;
-    int32_t y2 = area->y2 >= LV_VER_RES_MAX ? LV_VER_RES_MAX - 1 : area->y2;
+    int32_t ax1 = area->x1;
+    int32_t ay1 = area->y1;
+    int32_t ax2 = area->x2;
+    int32_t ay2 = area->y2;
+
+    int32_t x1 = ax1 < 0 ? 0 : ax1;
+    int32_t y1 = ay1 < 0 ? 0 : ay1;
+    int32_t x2 = ax2 >= LV_HOR_RES_MAX ? LV_HOR_RES_MAX - 1 : ax2;
+    int32_t y2 = ay2 >= LV_VER_RES_MAX ? LV_VER_RES_MAX - 1 : ay2;
 
     if (x1 > x2 || y1 > y2) {
         lv_disp_flush_ready(drv);
         return;
     }
 
-    uint32_t copy_width = (uint32_t)(x2 - x1 + 1);
-    uint32_t copy_height = (uint32_t)(y2 - y1 + 1);
+    int32_t src_w = ax2 - ax1 + 1;
+    const lv_color_t *base = color_p + (y1 - ay1) * src_w + (x1 - ax1);
 
-    if (dma2d_ready) {
-        SCB_CleanDCache();
-        hdma2d.Init.Mode = DMA2D_M2M;
-        hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
-        hdma2d.Init.OutputOffset = (uint32_t)(LV_HOR_RES_MAX - copy_width);
-        HAL_DMA2D_Init(&hdma2d);
-        HAL_DMA2D_Start(&hdma2d,
-            (uint32_t)color_p,
-            (uint32_t)(framebuffer + y1 * LV_HOR_RES_MAX + x1),
-            copy_width,
-            copy_height);
-        HAL_DMA2D_PollForTransfer(&hdma2d, 100);
-    } else {
-        for (int32_t y = y1; y <= y2; ++y) {
-            memcpy(framebuffer + y * LV_HOR_RES_MAX + x1, color_p, copy_width * sizeof(lv_color_t));
-            color_p += copy_width;
+    for (int32_t lx = x1; lx <= x2; lx++) {
+        int32_t px = (int32_t)PHYS_HOR_RES - 1 - y1;
+        int32_t py = lx;
+        uint32_t dst_idx = (uint32_t)(py * PHYS_HOR_RES + px);
+        const lv_color_t *src = base + (lx - x1);
+
+        for (int32_t ly = y1; ly <= y2; ly++) {
+            framebuffer[dst_idx] = *src;
+            dst_idx--;
+            src += src_w;
         }
     }
 
-    SCB_CleanDCache();
+    uint32_t fb_size = sizeof(lv_color_t) * PHYS_HOR_RES * PHYS_VER_RES;
+    SCB_CleanDCache_by_Addr((uint32_t *)((uintptr_t)framebuffer & ~(uintptr_t)31), (fb_size + 31) & ~(uint32_t)31);
     lv_disp_flush_ready(drv);
 }
 
@@ -162,10 +171,10 @@ void tft_init(void) {
         return;
     }
 
-    framebuffer = alloc_aligned_rooted(sizeof(lv_color_t) * LV_HOR_RES_MAX * LV_VER_RES_MAX, &MP_STATE_PORT(display_fb_raw));
+    framebuffer = alloc_aligned_rooted(sizeof(lv_color_t) * PHYS_HOR_RES * PHYS_VER_RES, &MP_STATE_PORT(display_fb_raw));
     draw_buf = alloc_aligned_rooted(sizeof(lv_color_t) * LV_HOR_RES_MAX * 20, &MP_STATE_PORT(display_drawbuf_raw));
 
-    memset(framebuffer, 0x00, sizeof(lv_color_t) * LV_HOR_RES_MAX * LV_VER_RES_MAX);
+    memset(framebuffer, 0x00, sizeof(lv_color_t) * PHYS_HOR_RES * PHYS_VER_RES);
 
     RCC_PeriphCLKInitTypeDef periph_clk = {0};
     periph_clk.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
@@ -196,9 +205,9 @@ void tft_init(void) {
 
     LTDC_LayerCfgTypeDef layer_cfg = {0};
     layer_cfg.WindowX0 = 0;
-    layer_cfg.WindowX1 = LV_HOR_RES_MAX;
+    layer_cfg.WindowX1 = PHYS_HOR_RES;
     layer_cfg.WindowY0 = 0;
-    layer_cfg.WindowY1 = LV_VER_RES_MAX;
+    layer_cfg.WindowY1 = PHYS_VER_RES;
     layer_cfg.PixelFormat = LTDC_PIXEL_FORMAT_ARGB8888;
     layer_cfg.FBStartAdress = (uint32_t)framebuffer;
     layer_cfg.Alpha = 255;
@@ -208,8 +217,8 @@ void tft_init(void) {
     layer_cfg.Backcolor.Red = 0;
     layer_cfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_CA;
     layer_cfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_CA;
-    layer_cfg.ImageWidth = LV_HOR_RES_MAX;
-    layer_cfg.ImageHeight = LV_VER_RES_MAX;
+    layer_cfg.ImageWidth = PHYS_HOR_RES;
+    layer_cfg.ImageHeight = PHYS_VER_RES;
     HAL_LTDC_ConfigLayer(&hltdc, &layer_cfg, 1);
 
     memset(&hdma2d, 0, sizeof(hdma2d));
@@ -278,10 +287,16 @@ static bool touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     uint16_t raw_x = (((uint16_t)raw[0] & 0x0F) << 8) | raw[1];
     uint16_t raw_y = (((uint16_t)raw[2] & 0x0F) << 8) | raw[3];
 
-    int16_t x = raw_y;
-    int16_t y = raw_x;
+    int16_t x = (int16_t)raw_y;
+    int16_t y = (int16_t)((int32_t)PHYS_HOR_RES - 1 - (int32_t)raw_x);
+    if (x < 0) {
+        x = 0;
+    }
     if (x >= LV_HOR_RES_MAX) {
         x = LV_HOR_RES_MAX - 1;
+    }
+    if (y < 0) {
+        y = 0;
     }
     if (y >= LV_VER_RES_MAX) {
         y = LV_VER_RES_MAX - 1;
@@ -295,12 +310,12 @@ static bool touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     return false;
 }
 
-static void dma2d_fill_rect(uint32_t color, int32_t x, int32_t y, int32_t w, int32_t h) {
+static void dma2d_fill_phys_rect(uint32_t color, int32_t x, int32_t y, int32_t w, int32_t h) {
     if (!dma2d_ready) {
         uint32_t *fb = (uint32_t *)framebuffer;
         for (int32_t row = y; row < y + h; row++) {
             for (int32_t col = x; col < x + w; col++) {
-                fb[row * LV_HOR_RES_MAX + col] = color;
+                fb[row * PHYS_HOR_RES + col] = color;
             }
         }
         return;
@@ -309,11 +324,11 @@ static void dma2d_fill_rect(uint32_t color, int32_t x, int32_t y, int32_t w, int
     SCB_CleanDCache();
     hdma2d.Init.Mode = DMA2D_R2M;
     hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
-    hdma2d.Init.OutputOffset = (uint32_t)(LV_HOR_RES_MAX - w);
+    hdma2d.Init.OutputOffset = (uint32_t)(PHYS_HOR_RES - w);
     HAL_DMA2D_Init(&hdma2d);
     HAL_DMA2D_Start(&hdma2d,
         color,
-        (uint32_t)(framebuffer + y * LV_HOR_RES_MAX + x),
+        (uint32_t)(framebuffer + y * PHYS_HOR_RES + x),
         (uint32_t)w,
         (uint32_t)h);
     HAL_DMA2D_PollForTransfer(&hdma2d, 100);
@@ -325,15 +340,15 @@ void tft_fill_test(void) {
     }
 
     SCB_CleanInvalidateDCache();
-    memset(framebuffer, 0x00, sizeof(lv_color_t) * LV_HOR_RES_MAX * LV_VER_RES_MAX);
+    memset(framebuffer, 0x00, sizeof(lv_color_t) * PHYS_HOR_RES * PHYS_VER_RES);
 
-    int32_t hw = LV_HOR_RES_MAX / 2;
-    int32_t hh = LV_VER_RES_MAX / 2;
+    int32_t hw = PHYS_HOR_RES / 2;
+    int32_t hh = PHYS_VER_RES / 2;
 
-    dma2d_fill_rect(0xFFFF0000, 0, 0, hw, hh);
-    dma2d_fill_rect(0xFF00FF00, hw, 0, hw, hh);
-    dma2d_fill_rect(0xFF0000FF, 0, hh, hw, hh);
-    dma2d_fill_rect(0xFFFFFF00, hw, hh, hw, hh);
+    dma2d_fill_phys_rect(0xFFFF0000, 0, 0, hw, hh);
+    dma2d_fill_phys_rect(0xFF00FF00, hw, 0, hw, hh);
+    dma2d_fill_phys_rect(0xFF0000FF, 0, hh, hw, hh);
+    dma2d_fill_phys_rect(0xFFFFFF00, hw, hh, hw, hh);
 
     SCB_CleanDCache();
 }
@@ -383,8 +398,10 @@ bool touchpad_get_point(uint16_t *x, uint16_t *y, bool *pressed) {
         return false;
     }
 
-    *x = (uint16_t)(((raw[0] & 0x0F) << 8) | raw[1]);
-    *y = (uint16_t)(((raw[2] & 0x0F) << 8) | raw[3]);
+    uint16_t raw_x = (uint16_t)(((raw[0] & 0x0F) << 8) | raw[1]);
+    uint16_t raw_y = (uint16_t)(((raw[2] & 0x0F) << 8) | raw[3]);
+    *x = raw_y;
+    *y = (uint16_t)((int32_t)PHYS_HOR_RES - 1 - (int32_t)raw_x);
     *pressed = true;
     return true;
 }

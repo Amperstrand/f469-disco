@@ -1,3 +1,3 @@
-import f7_specter_crypto
+import f7_specter_menu
 
-f7_specter_crypto.run()
+f7_specter_menu.run()

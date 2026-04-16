@@ -118,6 +118,23 @@ f7-specter-demo: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
 		$(TARGET_DIR)/upy-f7disc-specter-demo.bin
 
+f7-portrait-smoke: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
+	@echo Building F746G-DISCO portrait smoke firmware
+	make -C $(MPY_DIR)/ports/stm32 \
+		BOARD=STM32F7DISC \
+		USER_C_MODULES=../../../usermods_f7_display \
+		FROZEN_MANIFEST=../../../manifests/f7_portrait_smoke.py \
+		CFLAGS_EXTRA="-DMODULE_DISPLAY_ENABLED=1 -DDISABLE_NETWORK=1" \
+		MICROPY_SSL_MBEDTLS=0 \
+		MICROPY_PY_USSL=0 \
+		MICROPY_PY_LWIP=0 \
+		LD_FILES="boards/stm32f746_crypto.ld boards/common_ifs.ld" \
+		TEXT1_ADDR= \
+		DEBUG=$(DEBUG) && \
+	arm-none-eabi-objcopy -O binary \
+		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
+		$(TARGET_DIR)/upy-f7disc-portrait-smoke.bin
+
 # F746G-DISCO Specter crypto demo (display + secp256k1 + embit, no networking to save flash)
 f7-specter-crypto: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 	@echo Building F746G-DISCO Specter crypto firmware
