@@ -1,4 +1,5 @@
 import display
+import udisplay as ud
 import lvgl as lv
 import utime as time
 
@@ -28,29 +29,46 @@ def colored_block(parent, x, y, w, h, color_hex, label_text=""):
 def run():
     display.init(False)
 
-    # Phase 1: raw hardware fill test (4 colored quadrants)
     display.fill_test()
     time.sleep_ms(3000)
 
-    # Phase 2: minimal LVGL test — theme fills screen with 0xf0f0f0 (light gray)
-    # If whole screen turns light gray: rotation works.
-    # If diagonal/garbled: rotation math is wrong.
-    # If nothing changes: LVGL flush isn't running.
     th = lv.theme_material_init(210, lv.font_roboto_16)
     lv.theme_set_current(th)
 
     scr = lv.obj()
     lv.scr_load(scr)
 
-    title = lv.label(scr)
-    title.set_text("PORTRAIT 272x480")
-    title.align(scr, lv.ALIGN.IN_TOP_MID, 0, 5)
+    bw = 2
+    colored_block(scr, 0, 0, HOR_RES, bw, 0x00FF00)
+    colored_block(scr, 0, VER_RES - bw, HOR_RES, bw, 0x00FF00)
+    colored_block(scr, 0, 0, bw, VER_RES, 0x00FF00)
+    colored_block(scr, HOR_RES - bw, 0, bw, VER_RES, 0x00FF00)
 
-    # Two huge blocks covering top/bottom halves — unmistakable
-    half = VER_RES // 2
-    colored_block(scr, 0, 30, HOR_RES, half - 30, 0xFF0000, "TOP RED")
-    colored_block(scr, 0, half, HOR_RES, VER_RES - half - 10, 0x0000FF, "BOT BLUE")
+    colored_block(scr, 4, 8, 60, 30, 0xFF0000, "TL")
+    colored_block(scr, HOR_RES - 64, 8, 60, 30, 0x0000FF, "TR")
+    colored_block(scr, 4, VER_RES - 38, 60, 30, 0xFFFF00, "BL")
+    colored_block(scr, HOR_RES - 64, VER_RES - 38, 60, 30, 0xFF00FF, "BR")
+
+    title = lv.label(scr)
+    title.set_text("TOUCH TEST")
+    title.align(scr, lv.ALIGN.IN_TOP_MID, 0, 12)
+
+    touch_label = lv.label(scr)
+    touch_label.set_text("Touch the screen...")
+    touch_label.align(scr, lv.ALIGN.CENTER, 0, -20)
+
+    coord_label = lv.label(scr)
+    coord_label.set_text("X:--- Y:---")
+    coord_label.align(scr, lv.ALIGN.CENTER, 0, 10)
+
+    dot = colored_block(scr, HOR_RES // 2 - 10, VER_RES // 2 + 30, 20, 20, 0xFFFFFF)
 
     while True:
         display.update(30)
+        result = ud.touch_point()
+        if result is not None and result[0]:
+            x, y = result[1], result[2]
+            coord_label.set_text("X:%d Y:%d" % (x, y))
+            if 0 <= x < HOR_RES and 0 <= y < VER_RES:
+                dot.set_pos(x - 10, y - 10)
         time.sleep_ms(30)

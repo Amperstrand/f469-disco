@@ -52,8 +52,8 @@ static bool touch_ready;
 static bool dma2d_ready;
 
 static inline uint32_t phys_index_from_logical(int32_t lx, int32_t ly) {
-    int32_t px = (int32_t)PHYS_HOR_RES - 1 - ly;
-    int32_t py = lx;
+    int32_t px = ly;
+    int32_t py = (int32_t)PHYS_VER_RES - 1 - lx;
     return (uint32_t)(py * PHYS_HOR_RES + px);
 }
 
@@ -89,14 +89,14 @@ static void tft_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *col
     const lv_color_t *base = color_p + (y1 - ay1) * src_w + (x1 - ax1);
 
     for (int32_t lx = x1; lx <= x2; lx++) {
-        int32_t px = (int32_t)PHYS_HOR_RES - 1 - y1;
-        int32_t py = lx;
+        int32_t px = y1;
+        int32_t py = (int32_t)PHYS_VER_RES - 1 - lx;
         uint32_t dst_idx = (uint32_t)(py * PHYS_HOR_RES + px);
         const lv_color_t *src = base + (lx - x1);
 
         for (int32_t ly = y1; ly <= y2; ly++) {
             framebuffer[dst_idx] = *src;
-            dst_idx--;
+            dst_idx++;
             src += src_w;
         }
     }
@@ -287,8 +287,8 @@ static bool touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     uint16_t raw_x = (((uint16_t)raw[0] & 0x0F) << 8) | raw[1];
     uint16_t raw_y = (((uint16_t)raw[2] & 0x0F) << 8) | raw[3];
 
-    int16_t x = (int16_t)raw_y;
-    int16_t y = (int16_t)((int32_t)PHYS_HOR_RES - 1 - (int32_t)raw_x);
+    int16_t x = (int16_t)((int32_t)PHYS_VER_RES - 1 - (int32_t)raw_x);
+    int16_t y = (int16_t)raw_y;
     if (x < 0) {
         x = 0;
     }
@@ -400,8 +400,8 @@ bool touchpad_get_point(uint16_t *x, uint16_t *y, bool *pressed) {
 
     uint16_t raw_x = (uint16_t)(((raw[0] & 0x0F) << 8) | raw[1]);
     uint16_t raw_y = (uint16_t)(((raw[2] & 0x0F) << 8) | raw[3]);
-    *x = raw_y;
-    *y = (uint16_t)((int32_t)PHYS_HOR_RES - 1 - (int32_t)raw_x);
+    *x = (uint16_t)((int32_t)PHYS_VER_RES - 1 - (int32_t)raw_x);
+    *y = raw_y;
     *pressed = true;
     return true;
 }
