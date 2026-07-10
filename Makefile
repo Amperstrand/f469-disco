@@ -10,8 +10,10 @@ FROZEN_MANIFEST_F7_DISPLAY ?= ../../../manifests/f7_display.py
 FROZEN_MANIFEST_F7_TEST ?= ../../../manifests/f7_display_test.py
 FROZEN_MANIFEST_F7_SPECTER ?= ../../../manifests/f7_specter_demo.py
 FROZEN_MANIFEST_F7_SPECTER_CRYPTO ?= ../../../manifests/f7_specter_crypto.py
+FROZEN_MANIFEST_F7_SPECTER_EXTERNAL_POC ?= ../../../manifests/f7_specter_external_poc.py
 FROZEN_MANIFEST_UNIX ?= ../../../manifests/unix.py
 DEBUG ?= 0
+SPECTER_DIY_DIR ?= $(abspath ../specter-diy)
 
 F7_CFLAGS_EXTRA = -DMODULE_DISPLAY_ENABLED=1 -DMODULE_SECP256K1_ENABLED=1 -DMODULE_HASHLIB_ENABLED=1 -DMODULE_QRCODE_ENABLED=1
 
@@ -152,6 +154,23 @@ f7-specter-crypto: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 	arm-none-eabi-objcopy -O binary \
 		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
 		$(TARGET_DIR)/upy-f7disc-specter-crypto.bin
+
+f7-specter-external-poc: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
+	@echo Building F746G-DISCO external Specter PoC firmware
+	SPECTER_DIY_DIR="$(SPECTER_DIY_DIR)" make -C $(MPY_DIR)/ports/stm32 \
+		BOARD=STM32F7DISC \
+		USER_C_MODULES=../../../usermods_f7_specter \
+		FROZEN_MANIFEST=$(FROZEN_MANIFEST_F7_SPECTER_EXTERNAL_POC) \
+		CFLAGS_EXTRA="-DMODULE_DISPLAY_ENABLED=1 -DMODULE_HASHLIB_ENABLED=1 -DDISABLE_NETWORK=1 -DCRYPTO_BUILD=1" \
+		MICROPY_SSL_MBEDTLS=0 \
+		MICROPY_PY_USSL=0 \
+		MICROPY_PY_LWIP=0 \
+		LD_FILES="boards/stm32f746_crypto.ld boards/common_ifs.ld" \
+		TEXT1_ADDR= \
+		DEBUG=$(DEBUG) && \
+	arm-none-eabi-objcopy -O binary \
+		$(MPY_DIR)/ports/stm32/build-STM32F7DISC/firmware.elf \
+		$(TARGET_DIR)/upy-f7disc-specter-external-poc.bin
 
 # Legacy F469 targets (still work with explicit BOARD=STM32F469DISC)
 empty: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
