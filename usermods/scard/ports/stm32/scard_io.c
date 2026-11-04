@@ -160,8 +160,17 @@ static void set_half_duplex(scard_handle_t handle, hd_dir_t dir) {
     usart->CR1 |= USART_CR1_TE;
     HD_DEBUG_PRINTF("\r\n[set_half_duplex] TX mode (RE=0, TE=1)");
   } else if(dir == hd_dir_rx) {
-    // RX mode: wait for TX complete, disable TX, clear ORE, enable RX
-    if(usart->CR1 & USART_CR1_TE) { while(!(usart->SR & USART_SR_TC)) { } }
+    // RX mode: wait for TX complete (V1: bounded, 100ms max), disable TX, clear ORE, enable RX
+    if(usart->CR1 & USART_CR1_TE) {
+      mp_uint_t tc_timeout = 100; // ms — ample for any smartcard TX at any baud
+      while(!(usart->SR & USART_SR_TC)) {
+        if(--tc_timeout == 0) {
+          HD_DEBUG_PRINTF("\r\n[set_half_duplex] TX-complete TIMEOUT (100ms)");
+          break;
+        }
+        mp_hal_delay_ms(1);
+      }
+    }
     usart->CR1 &= ~USART_CR1_TE;
     // Clear overrun error if present (parasites before reception)
     if(usart->SR & USART_SR_ORE) {
@@ -171,8 +180,17 @@ static void set_half_duplex(scard_handle_t handle, hd_dir_t dir) {
     usart->CR1 |= USART_CR1_RE;
     HD_DEBUG_PRINTF("\r\n[set_half_duplex] RX mode (TE=0, RE=1)");
   } else {
-    // Neither: wait for TX complete, disable both
-    if(usart->CR1 & USART_CR1_TE) { while(!(usart->SR & USART_SR_TC)) { } }
+    // Neither: wait for TX complete (V1: bounded), disable both
+    if(usart->CR1 & USART_CR1_TE) {
+      mp_uint_t tc_timeout = 100;
+      while(!(usart->SR & USART_SR_TC)) {
+        if(--tc_timeout == 0) {
+          HD_DEBUG_PRINTF("\r\n[set_half_duplex] TX-complete TIMEOUT (100ms)");
+          break;
+        }
+        mp_hal_delay_ms(1);
+      }
+    }
     usart->CR1 &= ~(USART_CR1_TE | USART_CR1_RE);
     HD_DEBUG_PRINTF("\r\n[set_half_duplex] NONE mode (TE=0, RE=0)");
   }
@@ -454,6 +472,11 @@ void scard_configure_t1(scard_handle_t handle) {
   }
 #endif // STM32F4
 }
+// V1: reset half-duplex direction to neutral on disconnect — clears stuck-TX state
+void scard_reset_direction(scard_handle_t handle) {
+  set_half_duplex(handle, hd_dir_none);
+}
+
 void scard_interface_deinit(scard_handle_t handle) {
   scard_inst_t* self = (scard_inst_t*)handle;
 

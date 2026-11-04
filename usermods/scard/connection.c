@@ -1229,6 +1229,9 @@ STATIC mp_obj_t connection_disconnect(mp_obj_t self_in) {
     self->atr = MP_OBJ_NULL;
     self->response = MP_OBJ_NULL;
 
+    // V1: reset half-duplex direction so reconnect starts from neutral
+    scard_reset_direction(self->sc_handle);
+
     // Apply reset and remove power
     scard_pin_write(&self->rst_pin, ACT);
     scard_pin_write(&self->pwr_pin, INACT);
