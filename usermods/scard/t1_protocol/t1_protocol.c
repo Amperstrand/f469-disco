@@ -850,6 +850,29 @@ static bool handle_atr(t1_inst_t* inst, t1_atr_decoded_t* p_atr,
       inst->config[t1_cfg_use_crc] = p_atr->t1_bytes[t1_atr_tc1] & 1;
     }
 
+    // V3: BWT/CWT from TB(t1) per ISO 7816-3 §11.4.3
+    // 1 etu ≈ 104µs (F=372, f=3579545); BWT ≈ 2^BWI * 100ms; CWT ≈ (11+2^CWI)*104µs
+    int8_t tb1 = p_atr->t1_bytes[t1_atr_tb3];
+    uint8_t bwi = (tb1 != -1) ? ((uint8_t)tb1 >> 4) & 0x0F : 4;
+    uint8_t cwi = (tb1 != -1) ? ((uint8_t)tb1) & 0x0F : 5;
+    if(tb1 != -1) {
+      // BWT in ms: (11 + 2^BWI * 960 * 372/3579545) * 1000 / 1000000
+      // simplified: 11*104/1000 + 2^BWI * 960 * 104/1000000 ms
+      uint32_t bwt_ms = 1 + ((uint32_t)1 << bwi) * 100; // ≈ 2^BWI * 99.7ms
+      uint32_t cwt_ms = 1 + ((uint32_t)1 << cwi) / 8;   // ≈ (11+2^CWI)*104µs
+
+      if(bwt_ms < inst->config[t1_cfg_tm_response] || tb1 != -1) {
+        inst->config[t1_cfg_tm_response] = bwt_ms;
+      }
+      inst->config[t1_cfg_tm_interbyte] = (cwt_ms < 1) ? 1 : cwt_ms;
+
+      // scale ceiling: max BWT for this BWI, with WTX headroom (WTXM up to 255)
+      uint32_t max_ms = bwt_ms * 10; // generous WTX allowance
+      if(max_ms > inst->config[t1_cfg_tm_response_max]) {
+        inst->config[t1_cfg_tm_response_max] = max_ms;
+      }
+    }
+
     // If card is in negotiable mode we need to start PPS exchange
     if(p_atr->t1_bytes[t1_atr_ta2] == -1 && p_needs_ppsx) {
       *p_needs_ppsx = true;
