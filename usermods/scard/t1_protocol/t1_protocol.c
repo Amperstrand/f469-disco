@@ -858,7 +858,7 @@ static bool handle_atr(t1_inst_t* inst, t1_atr_decoded_t* p_atr,
     uint8_t cwi = (tb1 != -1) ? ((uint8_t)tb1) & 0x0F : 13;
     if(tb1 != -1) {
       // BWT x1.1 safety margin (cardbench: 3200-vs-3201 boundary flake 14/30)
-      uint32_t bwt_ms = 1 + (((uint32_t)1 << bwi) * 110) / 100;
+      uint32_t bwt_ms = 1 + ((uint32_t)1 << bwi) * 110;
       uint32_t cwt_ms = 1 + ((uint32_t)1 << cwi) / 8;
 
       inst->config[t1_cfg_tm_response] = bwt_ms;
