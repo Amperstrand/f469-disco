@@ -86,6 +86,7 @@ typedef struct connection_obj_ {
   int32_t max_timeout_ms;        ///< Maximal response timeout in ms
   bool raise_on_error;           ///< Forces exception for non-blocking mode
   bool t1_usart_configured;      ///< Flag: USART reconfigured for T=1 protocol
+  uint8_t tc1_value;             ///< V2: TC1 from ATR (guard time); 0xFF=reduced, else 12+N etu
   event_t event_buf[MAX_EVENTS]; ///< Event buffer
   size_t event_idx;              ///< Event index within event_buf[]
   mp_obj_t atr;                  ///< ATR as bytes object
@@ -285,7 +286,7 @@ static bool proto_cb_serial_out(mp_obj_t self_in, const uint8_t* buf,
   // (which is the IFSD request). This must happen after ATR reception
   // (which needs 1.5 stop bits) but before IFSD send.
   if(!self->t1_usart_configured && self->sc_handle) {
-    scard_configure_t1(self->sc_handle);
+    scard_configure_t1_gt(self->sc_handle, self->tc1_value);
     self->t1_usart_configured = true;
   }
   return scard_tx_write(self->sc_handle, buf, len);
@@ -307,10 +308,24 @@ static void proto_cb_handle_event(mp_obj_t self_in, proto_ev_code_t ev_code,
   connection_obj_t* self = (connection_obj_t*)self_in;
 
   switch(ev_code) {
-    case proto_ev_atr_received:
+    case proto_ev_atr_received: {
       self->atr = mp_obj_new_bytes(prm.atr_received->atr,
                                    prm.atr_received->len);
+      // V2: parse TC1 from raw ATR (Y1 bit 2 = TC1 present)
+      self->tc1_value = 0; // absent → ISO default CGT=12
+      const uint8_t* atr = prm.atr_received->atr;
+      size_t atr_len = prm.atr_received->len;
+      if(atr_len >= 3) {
+        uint8_t t0 = atr[1];
+        uint8_t off = 2;
+        if(t0 & 0x10) off++; // TA1 present
+        if(t0 & 0x20) off++; // TB1 present
+        if((t0 & 0x40) && off < atr_len) {
+          self->tc1_value = atr[off]; // TC1 present — V2 GT parameter
+        }
+      }
       break;
+    }
 
     case proto_ev_connect:
       if(state_connecting == self->state) {

@@ -439,6 +439,34 @@ bool scard_tx_write(scard_handle_t handle, const uint8_t* buf, size_t nbytes) {
  * Must be called after ATR is received and before first T=1 block is sent.
  * @param handle  smart card interface handle
  */
+// V2: ATR-driven guard time — CGT from TC1 per ISO 7816-3 §8.3
+// TC1==0xFF → CGT=11 (reduced); else CGT=12+TC1; TC1 absent → CGT=12 (default)
+void scard_configure_t1_gt(scard_handle_t handle, uint8_t tc1) {
+#if defined(STM32F4)
+  USART_TypeDef* usart = handle->sc_handle.Instance;
+  uint32_t irq_state = disable_irq();
+  uint8_t gt;
+
+  if(tc1 == 0xFF) {
+    gt = 11; // reduced guard time
+  } else {
+    gt = 12 + tc1; // standard: CGT = 12 + N etu
+  }
+
+  __HAL_SMARTCARD_DISABLE(&handle->sc_handle);
+  usart->CR2 &= ~USART_CR2_STOP; // 1 stop bit (T=1)
+  uint32_t psc = usart->GTPR & 0xFFU;
+  usart->GTPR = ((uint32_t)gt << 8) | psc;
+  __HAL_SMARTCARD_ENABLE(&handle->sc_handle);
+  enable_irq(irq_state);
+
+  if(scard_module_debug) {
+    printf("\r\nT=1 GT: TC1=0x%02X, CGT=%u etu, GTPR=0x%04lX",
+           tc1, gt, (unsigned long)usart->GTPR);
+  }
+#endif
+}
+
 void scard_configure_t1(scard_handle_t handle) {
 #if defined(STM32F4)
   USART_TypeDef* usart = handle->sc_handle.Instance;

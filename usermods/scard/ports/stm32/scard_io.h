@@ -60,6 +60,7 @@ static inline scard_pin_state_t scard_pin_read(scard_pin_dsc_t* p_pin) {
  * @param handle  smart card interface handle
  */
 void scard_configure_t1(scard_handle_t handle);
+void scard_configure_t1_gt(scard_handle_t handle, uint8_t tc1);
 void scard_reset_direction(scard_handle_t handle);
 
 #endif // SCARD_IO_H_INCLUDED
