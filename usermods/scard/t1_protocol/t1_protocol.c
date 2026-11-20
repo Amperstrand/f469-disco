@@ -850,6 +850,26 @@ static bool handle_atr(t1_inst_t* inst, t1_atr_decoded_t* p_atr,
       inst->config[t1_cfg_use_crc] = p_atr->t1_bytes[t1_atr_tc1] & 1;
     }
 
+    // V3.1: BWT/CWT from TB(t1) per ISO 7816-3 §11.4.3 (first TB for T=1)
+    // 1 etu ≈ 104µs; BWT ≈ 2^BWI * 100ms; CWT ≈ (11+2^CWI)*104µs
+    // Defaults per ISO: BWI=4, CWI=13 (v3 bug: 5 was SeedKeeper leaking)
+    int8_t tb1 = p_atr->t1_bytes[t1_atr_tb1]; // v3.1: tb3→tb1 (real cards land in tb1)
+    uint8_t bwi = (tb1 != -1) ? ((uint8_t)tb1 >> 4) & 0x0F : 4;
+    uint8_t cwi = (tb1 != -1) ? ((uint8_t)tb1) & 0x0F : 13;
+    if(tb1 != -1) {
+      // BWT x1.1 safety margin (cardbench: 3200-vs-3201 boundary flake 14/30)
+      uint32_t bwt_ms = 1 + ((uint32_t)1 << bwi) * 110;
+      uint32_t cwt_ms = 1 + ((uint32_t)1 << cwi) / 8;
+
+      inst->config[t1_cfg_tm_response] = bwt_ms;
+      inst->config[t1_cfg_tm_interbyte] = (cwt_ms < 1) ? 1 : cwt_ms;
+
+      uint32_t max_ms = bwt_ms * 10;
+      if(max_ms > inst->config[t1_cfg_tm_response_max]) {
+        inst->config[t1_cfg_tm_response_max] = max_ms;
+      }
+    }
+
     // If card is in negotiable mode we need to start PPS exchange
     if(p_atr->t1_bytes[t1_atr_ta2] == -1 && p_needs_ppsx) {
       *p_needs_ppsx = true;
